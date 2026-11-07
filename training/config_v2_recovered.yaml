@@ -1,0 +1,18 @@
+# Everything train.py needs. `make train` reads only this file (plus SUBSET for the smoke test).
+model_name: EleutherAI/pythia-70m
+version: v2                     # output goes to artifacts/<version>/ and is uploaded to models/<version>/
+train_file: results/recovered_v1/train.jsonl    # fetched from the datasets bucket (datasets/v1/train.jsonl) by `make fetch-train`
+max_records: 1500               # the first 1,500 records of the cleaned dataset
+seed: 7
+learning_rate: 0.0001
+batch_size: 16
+epochs: 4
+max_seq_length: 128
+mask_prompt_loss: true          # loss only on the JSON reply (+ end-of-text), not on "Command: ...\nJSON:"
+loss_csv: training/loss_v2.csv
+libraries:                      # recorded versions (train.py also logs the installed ones)
+  python: "3.11"
+  torch: "2.4.1"
+  transformers: "4.44.2"
+  numpy: "1.26.4"
+  pyyaml: "6.0.2"

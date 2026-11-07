@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata: {name: cmdparser, namespace: app}
+spec:
+  selector: {app: cmdparser}
+  ports: [{name: http, port: 80, targetPort: 8000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cmdparser
+  namespace: app
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - {path: /parse, pathType: Prefix, backend: {service: {name: cmdparser, port: {number: 80}}}}
+---
+# Utilisation is measured against the CPU *request* (500m), so 70% = 350m per Pod.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: cmdparser, namespace: app}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: cmdparser}
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}

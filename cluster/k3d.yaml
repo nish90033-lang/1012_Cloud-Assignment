@@ -1,0 +1,14 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: cmdparser
+servers: 1
+agents: 0            # single node: this setup cannot demonstrate multi-machine fault tolerance
+ports:
+  - port: 8080:80    # Traefik ingress  -> http://localhost:8080/parse
+    nodeFilters: [loadbalancer]
+  - port: 8333:8333  # SeaweedFS S3 API (Service type LoadBalancer) -> http://localhost:8333
+    nodeFilters: [loadbalancer]
+options:
+  k3s:
+    extraArgs: []    # k3s ships Traefik and metrics-server by default (both are needed)

@@ -1,0 +1,84 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      model_source:
+        description: "release = trained model from the GitHub Release; baseline = untrained EleutherAI/pythia-70m (the gate must FAIL)"
+        default: release
+        type: choice
+        options: [release, baseline]
+      release_tag:
+        description: Release tag that holds model-v1.tar.gz
+        default: model-v1
+
+jobs:
+  # Stage 1: linting (+ secret scan, which must report nothing)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install ruff==0.6.9
+      - run: ruff check .
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Stage 2: unit tests
+  unit-tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  # Stage 3: model evaluation on validation.jsonl with the model from the GitHub Release (or the untrained baseline)
+  evaluate:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements-train.txt jsonschema==4.23.0
+      - name: Get the model
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE: ${{ github.event.inputs.model_source || 'release' }}
+          TAG: ${{ github.event.inputs.release_tag || 'model-v1' }}
+        run: |
+          if [ "$SOURCE" = "baseline" ]; then
+            echo "MODEL=EleutherAI/pythia-70m" >> "$GITHUB_ENV"
+          else
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.tar.gz' --pattern '*.sha256' --dir release
+            (cd release && sha256sum -c *.sha256)
+            mkdir model && tar -xzf release/*.tar.gz -C model
+            echo "MODEL=model" >> "$GITHUB_ENV"
+          fi
+      - name: Run model on validation.jsonl and score
+        run: |
+          mkdir -p results
+          python evaluate/run_student.py --model "$MODEL" --out results/ci_predictions.jsonl
+          python tools/score.py results/ci_predictions.jsonl data/validation.jsonl --out results/ci_report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval
+          path: results/ci_*
+
+  # Stage 4: quality gate. Fails the run when JSON validity is below 95%.
+  quality-gate:
+    needs: evaluate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: eval, path: results}
+      - run: python tools/score.py results/ci_predictions.jsonl data/validation.jsonl --min-validity 95
