@@ -22,3 +22,6 @@ data/train.jsonl
 *.bak
 .DS_Store
 report/report_DRAFT.pdf
+
+# Local fresh-clone verification
+1012_Cloud-Assignment/

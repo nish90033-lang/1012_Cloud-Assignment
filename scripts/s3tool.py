@@ -81,7 +81,7 @@ def main():
             tmp = tempfile.mkdtemp()
             tgz = os.path.join(tmp, f"model-{v}.tar.gz")
             urllib.request.urlretrieve(a.release_url, tgz)
-            urllib.request.urlretrieve(a.release_url.replace(".tar.gz", ".sha256"), os.path.join(tmp, "model.sha256"))
+            urllib.request.urlretrieve(a.release_url.rsplit("/", 1)[0] + "/model.sha256", os.path.join(tmp, "model.sha256"))
             want = open(os.path.join(tmp, "model.sha256")).read().split()[0]
             if sha256(tgz) != want:
                 sys.exit("checksum mismatch for the release asset")

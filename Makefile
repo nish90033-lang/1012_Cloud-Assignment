@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 # Edit REPO to your GitHub "owner/name" (used to fetch the model release on a fresh clone).
-REPO        ?= YOUR_GITHUB_USER/cloud-cmd-parser
+REPO        ?= nish90033-lang/1012_Cloud-Assignment
 RELEASE_URL ?= https://github.com/$(REPO)/releases/download
 CLUSTER     := cmdparser
 VENV        := .venv
